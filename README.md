@@ -76,7 +76,7 @@ To get this project up and running, follow these steps:
 1.  **Clone the Repository:**
 
     ```
-    git clone [https://github.com/your-username/qlora-medical-captioning.git](https://github.com/your-username/qlora-medical-captioning.git)
+    git clone [https://github.com/avinashpaul2022/qlora-medical-captioning.git](https://github.com/avinashpaul2022/qlora-medical-captioning.git)
     cd qlora-medical-captioning
     ```
 
