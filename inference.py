@@ -1,10 +1,14 @@
+# inference_with_cider.py
+# This script uses a fine-tuned BLIP model to generate a caption for a single image,
+# and then calculates the CIDEr score against a provided reference caption.
+
 import torch
 from transformers import BlipProcessor, BlipForConditionalGeneration, BitsAndBytesConfig
 from peft import PeftModel
 from PIL import Image
-import requests
 import evaluate
-from datasets import Dataset
+import argparse
+import os
 
 # --- 1. CONFIGURATION ---
 
@@ -21,79 +25,72 @@ bnb_config = BitsAndBytesConfig(
     bnb_4bit_use_double_quant=False,
 )
 
-# --- 2. MODEL AND ADAPTER LOADING ---
+# --- 2. ARGUMENT PARSER ---
+
+# Setup an argument parser to take the image path and reference caption from the command line.
+parser = argparse.ArgumentParser(description="Generate a caption and calculate CIDEr for a single image.")
+parser.add_argument("--image_path", type=str, required=True, help="Path to the image file to be captioned.")
+parser.add_argument("--reference_caption", type=str, required=True, help="The ground-truth caption for the image.")
+args = parser.parse_args()
+
+# --- 3. MODEL AND ADAPTER LOADING ---
 
 # Load the base model with 4-bit quantization
 print("Loading base model...")
-base_model = BlipForConditionalGeneration.from_pretrained(
-    MODEL_NAME,
-    quantization_config=bnb_config,
-    torch_dtype=torch.bfloat16,
-    device_map="auto"
-)
+try:
+    base_model = BlipForConditionalGeneration.from_pretrained(
+        MODEL_NAME,
+        quantization_config=bnb_config,
+        torch_dtype=torch.bfloat16,
+        device_map="auto"
+    )
+except Exception as e:
+    print(f"Error loading base model: {e}")
+    exit()
 
 # Load the processor (tokenizer and image processor)
 processor = BlipProcessor.from_pretrained(MODEL_NAME)
 
 # Load the fine-tuned adapters
 print("Loading and merging QLoRA adapters...")
-model = PeftModel.from_pretrained(base_model, ADAPTER_PATH)
-
-# Merge the adapters into the base model for a consolidated model for inference
-model = model.merge_and_unload()
-model.eval()
+try:
+    model = PeftModel.from_pretrained(base_model, ADAPTER_PATH)
+    # Merge the adapters into the base model for a consolidated model for inference
+    model = model.merge_and_unload()
+    model.eval()
+except Exception as e:
+    print(f"Error loading adapters: {e}")
+    print(f"Please ensure the adapter is saved at '{ADAPTER_PATH}' and is compatible with the base model.")
+    exit()
 
 print("Model and adapters loaded successfully.")
 
-# --- 3. INFERENCE DATA PREPARATION ---
-
-def create_inference_data():
-    """
-    Generates a dummy dataset with images and ground-truth captions.
-    For CIDEr calculation, each example must have a list of reference captions.
-    """
-    # Real, publicly accessible chest X-ray image URLs.
-    # Note: These URLs are for demonstration purposes.
-    image_url_1 = "https://i.imgur.com/W205S6L.jpeg"
-    image_url_2 = "https://i.imgur.com/GzI8y4C.jpeg"
-
-    data = {
-        "image_url": [image_url_1, image_url_2],
-        "image_text": [
-            "The chest x-ray shows a small, non-displaced fracture of the right fifth rib. There is no evidence of pneumothorax or pleural effusion. The lungs are clear.",
-            "Normal chest x-ray. The heart size is within normal limits. The mediastinal and hilar contours are unremarkable. No pulmonary opacities or effusions are seen.",
-        ],
-        "image_id": ["fractured_rib_001", "normal_chest_002"]
-    }
-    return Dataset.from_dict(data)
-
-inference_dataset = create_inference_data()
-
 # --- 4. INFERENCE FUNCTION ---
 
-def generate_caption(image_path):
+def generate_caption(image_path, model, processor):
     """
     Generates a caption for a given image path.
     Args:
-        image_path (str): The local path or URL of the image.
+        image_path (str): The local path of the image.
     Returns:
         str: The generated caption.
     """
+    if not os.path.exists(image_path):
+        print(f"Error: Image file not found at '{image_path}'.")
+        return None
+        
     try:
-        if image_path.startswith("http"):
-            image = Image.open(requests.get(image_path, stream=True).raw).convert("RGB")
-        else:
-            image = Image.open(image_path).convert("RGB")
+        image = Image.open(image_path).convert("RGB")
     except Exception as e:
         print(f"Error loading image: {e}")
-        return "Failed to load image."
+        return None
 
     # Preprocess the image
     inputs = processor(images=image, return_tensors="pt").to(model.device, model.dtype)
 
     # Generate the caption using the fine-tuned model
-    # The `pixel_values` are the preprocessed image data
-    out = model.generate(**inputs, max_length=50)
+    with torch.no_grad():
+        out = model.generate(**inputs, max_length=50)
 
     # Decode the generated tokens back to a string
     caption = processor.decode(out[0], skip_special_tokens=True)
@@ -101,34 +98,29 @@ def generate_caption(image_path):
 
 # --- 5. RUN INFERENCE AND EVALUATION ---
 
-generated_captions = []
-reference_captions = []
-image_ids = []
-
 print("\nStarting inference and evaluation...")
-for i, example in enumerate(inference_dataset):
-    # Generate a caption for the image
-    generated_caption = generate_caption(example["image_url"])
-    print(f"\nExample {i+1}:")
+
+# Generate a caption for the single image
+generated_caption = generate_caption(args.image_path, model, processor)
+
+if generated_caption:
+    print(f"\nImage Path: {args.image_path}")
     print(f"  Generated Caption: {generated_caption}")
-    print(f"  Reference Caption: {example['image_text']}")
+    print(f"  Reference Caption: {args.reference_caption}")
+
+    # Initialize CIDEr metric
+    cider_metric = evaluate.load("cider")
+
+    # CIDEr requires a specific format for predictions and references.
+    # We will create single-item lists for the single image.
+    # For CIDEr, the reference must be a list of lists of dictionaries.
+    predictions = [{"prediction": generated_caption, "id": "user_image"}]
+    references = [[{"reference": args.reference_caption, "id": "user_image"}]]
     
-    generated_captions.append(generated_caption)
-    reference_captions.append(example["image_text"])
-    image_ids.append(example["image_id"])
+    # Compute the CIDEr score
+    cider_score = cider_metric.compute(predictions=predictions, references=references)
 
-# Initialize CIDEr metric
-cider_metric = evaluate.load("cider")
-
-# CIDEr requires a specific format:
-# predictions = [{"prediction": "generated text", "id": "image_id"}]
-# references = [[{"reference": "reference text", "id": "image_id"}]]
-predictions = [{"prediction": c, "id": i} for c, i in zip(generated_captions, image_ids)]
-references = [[{"reference": r, "id": i}] for r, i in zip(reference_captions, image_ids)]
-
-# Compute the CIDEr score
-cider_score = cider_metric.compute(predictions=predictions, references=references)
-
-print("\n--- Final Results ---")
-print(f"Total examples processed: {len(generated_captions)}")
-print(f"CIDEr Score: {cider_score['cider']:.4f}")
+    print("\n--- Final Results ---")
+    print(f"CIDEr Score: {cider_score['cider']:.4f}")
+else:
+    print("\nInference failed. CIDEr score cannot be calculated.")
