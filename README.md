@@ -1,18 +1,11 @@
-QLoRA-Powered Multimodal Medical Image Captioning
+
+# QLoRA-Powered Multimodal Medical Image Captioning
 
 A highly efficient, end-to-end project demonstrating the fine-tuning of a large multimodal model for a specialized medical task on resource-constrained hardware.
 
-### **Project Demonstration**
+### **Project Description**
 
-This project showcases how a model can be adapted to understand and describe medical images with high accuracy. The following example highlights the difference between the base model and the fine-tuned model's performance on unseen medical data.
-
-**Image: Chest X-Ray**
-
-* **Note:** Please replace the placeholder image below with a real chest X-ray image from your dataset.
-
-* **Base Model Caption:** "A close-up shot of a black and white image."
-
-* **Fine-Tuned Model Caption:** "The chest x-ray shows a nodule in the right upper lobe, with no evidence of pleural effusion or pneumothorax. The heart size is within normal limits."
+This project focuses on leveraging **QLoRA (Quantized Low-Rank Adaptation)** to fine-tune the **BLIP-large multimodal model** for the specialized task of generating accurate medical image captions. The core objective is to adapt a large, 1.8-billion-parameter model to a new domain without requiring high-end hardware. The project successfully demonstrates how this method can produce medically relevant and descriptive captions while maintaining an exceptionally low VRAM footprint for both training and inference.
 
 ### **1. Problem Statement**
 
@@ -81,3 +74,7 @@ This project showcases how a model can be adapted to understand and describe med
 To get this project up and running, follow these steps:
 
 1. **Clone the Repository:**
+
+   ```bash
+   git clone [https://github.com/your-username/your-repository-name.git](https://github.com/your-username/your-repository-name.git)
+   cd your-repository-name
