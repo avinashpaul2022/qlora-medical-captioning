@@ -31,23 +31,23 @@ This project focuses on leveraging **QLoRA (Quantized Low-Rank Adaptation)** to 
 
 ### **3. Implementation Details**
 
-1. **Dataset Mention:** The model was fine-tuned on the publicly available **IU X-Ray dataset**, a collection of medical images and corresponding clinical reports.
+1.  **Dataset Mention:** The model was fine-tuned on the publicly available **IU X-Ray dataset**, a collection of medical images and corresponding clinical reports.
 
-2. **Model Loading:** The `blip-image-captioning-large` model was loaded with `BitsAndBytesConfig` using `load_in_4bit=True` to place the model weights in the 4-bit NF4 format on the GPU.
+2.  **Model Loading:** The `blip-image-captioning-large` model was loaded with `BitsAndBytesConfig` using `load_in_4bit=True` to place the model weights in the 4-bit NF4 format on the GPU.
 
-3. **Tokenizer and Processor:** The `BlipProcessor` was used to handle both image pre-processing (resizing, normalization) and text tokenization in a single step.
+3.  **Tokenizer and Processor:** The `BlipProcessor` was used to handle both image pre-processing (resizing, normalization) and text tokenization in a single step.
 
-4. **Dataset Preparation:** The custom dataset was converted into a Hugging Face `Dataset` object. Images were processed using the processor, and captions were tokenized with attention masks and labels prepared for the training loop.
+4.  **Dataset Preparation:** The custom dataset was converted into a Hugging Face `Dataset` object. Images were processed using the processor, and captions were tokenized with attention masks and labels prepared for the training loop.
 
-5. **PEFT Configuration:** A `peft.LoraConfig` was defined with a rank (`r`) of 8 and a learning rate alpha of 32, targeting the key attention and MLP layers (`query`, `value`, `dense`) for adaptation.
+5.  **PEFT Configuration:** A `peft.LoraConfig` was defined with a rank (`r`) of 8 and a learning rate alpha of 32, targeting the key attention and MLP layers (`query`, `value`, `dense`) for adaptation.
 
-6. **Issue Faced - Initial VRAM Overload:** The very first training attempts resulted in a `CUDA out of memory` error. **This was resolved** by setting `per_device_train_batch_size=1` and using `gradient_accumulation_steps=4`, effectively emulating a larger batch size without exceeding the VRAM limit.
+6.  **Issue Faced - Initial VRAM Overload:** The very first training attempts resulted in a `CUDA out of memory` error. **This was resolved** by setting `per_device_train_batch_size=1` and using `gradient_accumulation_steps=4`, effectively emulating a larger batch size without exceeding the VRAM limit.
 
-7. **TrainingArguments Setup:** The `transformers.TrainingArguments` class was configured with specific hyperparameters, including a `learning_rate` of 2e-4, `num_train_epochs=5`, and a cosine learning rate scheduler (`lr_scheduler_type='cosine'`).
+7.  **TrainingArguments Setup:** The `transformers.TrainingArguments` class was configured with specific hyperparameters, including a `learning_rate` of 2e-4, `num_train_epochs=5`, and a cosine learning rate scheduler (`lr_scheduler_type='cosine'`).
 
-8. **Hyperparameter Tuning:** A sweep was conducted on the LoRA parameters (`r` and `alpha`), with the `transformers.Trainer` class automatically computing the **CIDEr score** on the validation set after each epoch.
+8.  **Hyperparameter Tuning:** A sweep was conducted on the LoRA parameters (`r` and `alpha`), with the `transformers.Trainer` class automatically computing the **CIDEr score** on the validation set after each epoch.
 
-9. **Issue Faced - Finding the "Sweet Spot":** Initial low `r` values resulted in poor performance, while higher values threatened VRAM limits. **This was solved** by identifying that a rank (`r`) of **8** offered the best CIDEr score of **0.78** while remaining within the 4 GB VRAM budget.
+9.  **Issue Faced - Finding the "Sweet Spot":** Initial low `r` values resulted in poor performance, while higher values threatened VRAM limits. **This was solved** by identifying that a rank (`r`) of **8** offered the best CIDEr score of **0.78** while remaining within the 4 GB VRAM budget.
 
 10. **Adapter Merging:** Once the optimal adapters were found, they were seamlessly fused into the base model using the `.merge_and_unload()` function from the `peft` library. This created a single, consolidated model.
 
@@ -73,8 +73,41 @@ This project focuses on leveraging **QLoRA (Quantized Low-Rank Adaptation)** to 
 
 To get this project up and running, follow these steps:
 
-1. **Clone the Repository:**
+1.  **Clone the Repository:**
 
-   ```bash
-   git clone [https://github.com/your-username/your-repository-name.git](https://github.com/your-username/your-repository-name.git)
-   cd your-repository-name
+    ```
+    git clone [https://github.com/your-username/qlora-medical-captioning.git](https://github.com/your-username/qlora-medical-captioning.git)
+    cd qlora-medical-captioning
+    ```
+
+2.  **Set Up the Environment:**
+    It is highly recommended to use a virtual environment.
+
+    ```
+    python -m venv venv
+    # On macOS and Linux
+    source venv/bin/activate
+    # On Windows
+    .\venv\Scripts\activate
+    ```
+
+3.  **Install Dependencies:**
+    Install all the required libraries using the provided `requirements.txt` file.
+
+    ```
+    pip install -r requirements.txt
+    ```
+
+4.  **Run Fine-Tuning:**
+    To train the model with QLoRA, execute the `finetune.py` script. This process will use the settings we configured to fine-tune the model on your hardware. It will create a new directory containing the fine-tuned adapter weights.
+
+    ```
+    python finetune.py
+    ```
+
+5.  **Run Inference:**
+    After the training is complete, you can use the `inference.py` script to test the model. This script loads the fine-tuned adapters and generates captions for the images in the script.
+
+    ```
+    python inference.py
+    ```
