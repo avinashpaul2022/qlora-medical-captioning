@@ -5,7 +5,8 @@ A highly efficient, end-to-end project demonstrating the fine-tuning of a large 
 ### **Project Description**
 
 This project focuses on leveraging **QLoRA (Quantized Low-Rank Adaptation)** to fine-tune the **BLIP-large multimodal model** for the specialized task of generating accurate medical image captions. The core objective is to adapt a large, 1.8-billion-parameter model to a new domain without requiring high-end hardware. The project successfully demonstrates how this method can produce medically relevant and descriptive captions while maintaining an exceptionally low VRAM footprint for both training and inference.
-!https://github.com/avinashpaul2022/qlora-medical-captioning/blob/main/1000_IM-0003-3001.dcm.png
+![76052f7902246ff862f52f5d3cd9cd_big_gallery](https://github.com/user-attachments/assets/f2f26e9c-e81d-4a05-b970-4553118d7c0a)
+
 ### **1. Problem Statement**
 
 * **VRAM Constraint:** The central challenge was a hard VRAM limit of **4 GB** on a consumer-grade laptop GPU, making traditional fine-tuning of large models unfeasible.
